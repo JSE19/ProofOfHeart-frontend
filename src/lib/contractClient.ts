@@ -2,6 +2,7 @@ import * as StellarSdk from '@stellar/stellar-sdk';
 import { signTransaction, getAddress } from '@stellar/freighter-api';
 import { Campaign, CampaignStatus, Category } from '../types';
 import { parseContractError } from '../utils/contractErrors';
+import { appendWalletTransaction } from './transactionLog';
 
 // ---------------------------------------------------------------------------
 // Environment configuration
@@ -462,6 +463,12 @@ export async function contribute(
   );
   try {
     const txResult = await buildAndSubmitTransaction(contributor, op);
+    appendWalletTransaction({
+      walletAddress: contributor,
+      campaignId,
+      action: 'contribute',
+      txHash: txResult.txHash,
+    });
     return txResult.txHash;
   } catch (err) {
     throw new Error(parseContractError(err));
@@ -521,6 +528,12 @@ export async function claimRefund(
   );
   try {
     const txResult = await buildAndSubmitTransaction(contributor, op);
+    appendWalletTransaction({
+      walletAddress: contributor,
+      campaignId,
+      action: 'claim_refund',
+      txHash: txResult.txHash,
+    });
     return txResult.txHash;
   } catch (err) {
     throw new Error(parseContractError(err));
@@ -560,6 +573,12 @@ export async function claimRevenue(
   );
   try {
     const txResult = await buildAndSubmitTransaction(contributor, op);
+    appendWalletTransaction({
+      walletAddress: contributor,
+      campaignId,
+      action: 'claim_revenue',
+      txHash: txResult.txHash,
+    });
     return txResult.txHash;
   } catch (err) {
     throw new Error(parseContractError(err));
@@ -574,6 +593,48 @@ export async function verifyCampaign(campaignId: number): Promise<string> {
     'verify_campaign',
     StellarSdk.nativeToScVal(campaignId, { type: 'u32' }),
   );
+  try {
+    const txResult = await buildAndSubmitTransaction(callerAddress, op);
+    return txResult.txHash;
+  } catch (err) {
+    throw new Error(parseContractError(err));
+  }
+}
+
+/**
+ * Update the platform fee (admin only).
+ */
+export async function updatePlatformFee(platformFee: number): Promise<string> {
+  if (USE_MOCKS) return 'mock_tx_update_platform_fee';
+
+  const { address: callerAddress } = await getAddress();
+  const contract = new StellarSdk.Contract(CONTRACT_ADDRESS);
+  const op = contract.call(
+    'update_platform_fee',
+    StellarSdk.nativeToScVal(platformFee, { type: 'u32' }),
+  );
+
+  try {
+    const txResult = await buildAndSubmitTransaction(callerAddress, op);
+    return txResult.txHash;
+  } catch (err) {
+    throw new Error(parseContractError(err));
+  }
+}
+
+/**
+ * Transfer the admin role to a new address (admin only).
+ */
+export async function updateAdmin(newAdmin: string): Promise<string> {
+  if (USE_MOCKS) return 'mock_tx_update_admin';
+
+  const { address: callerAddress } = await getAddress();
+  const contract = new StellarSdk.Contract(CONTRACT_ADDRESS);
+  const op = contract.call(
+    'update_admin',
+    new StellarSdk.Address(newAdmin).toScVal(),
+  );
+
   try {
     const txResult = await buildAndSubmitTransaction(callerAddress, op);
     return txResult.txHash;
